@@ -384,30 +384,33 @@
                     data.forEach(file => {
                         if (file.type === 'directory') {
                             html += `
-                                <a href="#" class="list-group-item list-group-item-action file-item" data-path="${path ? path + '/' + file.name : file.name}">
-                                    <div class="d-flex align-items-center">
-                                        <span class="file-icon directory-icon">📁</span>
-                                        <div class="flex-grow-1">
-                                            <h6 class="mb-1">${file.name}</h6>
-                                            <small class="text-muted">目录</small>
-                                        </div>
+                                <div class="list-group-item file-item">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <a href="#" class="d-flex align-items-center text-decoration-none flex-grow-1" data-path="${path ? path + '/' + file.name : file.name}">
+                                            <span class="file-icon directory-icon">📁</span>
+                                            <div>
+                                                <h6 class="mb-1">${file.name}</h6>
+                                                <small class="text-muted">目录</small>
+                                            </div>
+                                        </a>
+                                        <button class="btn btn-sm btn-danger delete-file" data-path="${path ? path + '/' + file.name : file.name}" data-type="directory">删除</button>
                                     </div>
-                                </a>
+                                </div>
                             `;
                         } else {
                             html += `
-                                <a href="/download/${path ? path + '/' + file.name : file.name}" class="list-group-item list-group-item-action file-item" target="_blank">
+                                <div class="list-group-item file-item">
                                     <div class="d-flex align-items-center justify-content-between">
-                                        <div class="d-flex align-items-center">
+                                        <a href="/download/${path ? path + '/' + file.name : file.name}" class="d-flex align-items-center text-decoration-none flex-grow-1" target="_blank">
                                             <span class="file-icon">📄</span>
                                             <div>
                                                 <h6 class="mb-1">${file.name}</h6>
                                                 <small class="text-muted">${formatFileSize(file.size)} · ${formatTime(file.mtime)}</small>
                                             </div>
-                                        </div>
-                                        <span class="badge bg-secondary">下载</span>
+                                        </a>
+                                        <button class="btn btn-sm btn-danger delete-file" data-path="${path ? path + '/' + file.name : file.name}" data-type="file">删除</button>
                                     </div>
-                                </a>
+                                </div>
                             `;
                         }
                     });
@@ -415,13 +418,24 @@
                     filesList.innerHTML = html;
                     
                     // 添加目录点击事件
-                    document.querySelectorAll('.file-item[data-path]').forEach(item => {
+                    document.querySelectorAll('.file-item a[data-path]').forEach(item => {
                         item.addEventListener('click', function(e) {
                             e.preventDefault();
                             const newPath = this.getAttribute('data-path');
                             currentPath = newPath;
                             loadFiles(newPath);
                             updateBreadcrumb(newPath);
+                        });
+                    });
+                    
+                    // 添加删除文件事件
+                    document.querySelectorAll('.delete-file').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const filePath = this.getAttribute('data-path');
+                            const fileType = this.getAttribute('data-type');
+                            if (confirm(`确定要删除这个${fileType === 'directory' ? '目录' : '文件'}吗？`)) {
+                                deleteFile(filePath);
+                            }
                         });
                     });
                 })
@@ -558,6 +572,30 @@
                 .catch(error => {
                     console.error('获取进度失败:', error);
                 });
+        }
+        
+        // 删除文件
+        function deleteFile(path) {
+            fetch('/api/file', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ path: path })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('文件已删除');
+                    loadFiles(currentPath);
+                } else {
+                    showNotification('删除文件失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('删除文件失败:', error);
+                showNotification('删除文件失败', 'error');
+            });
         }
         
         // 取消任务

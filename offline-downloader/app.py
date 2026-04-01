@@ -298,6 +298,36 @@ def remove_task(gid):
     else:
         return jsonify({"error": "Task not found"}), 404
 
+# 删除文件
+@app.route('/api/file', methods=['DELETE'])
+def delete_file():
+    data = request.json
+    path = data.get('path', '')
+    full_path = os.path.join(download_dir, path)
+    
+    # 安全检查，确保不会访问下载目录外的文件
+    if not full_path.startswith(download_dir):
+        return jsonify({"error": "Invalid path"}), 403
+    
+    if not os.path.exists(full_path):
+        return jsonify({"error": "File not found"}), 404
+    
+    try:
+        if os.path.isfile(full_path):
+            os.remove(full_path)
+            print(f"删除文件: {full_path}")
+            sys.stdout.flush()
+        elif os.path.isdir(full_path):
+            import shutil
+            shutil.rmtree(full_path)
+            print(f"删除目录: {full_path}")
+            sys.stdout.flush()
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"删除失败: {str(e)}")
+        sys.stdout.flush()
+        return jsonify({"error": str(e)}), 500
+
 # 提供静态文件服务
 @app.route('/static/<path:path>')
 def send_static(path):
