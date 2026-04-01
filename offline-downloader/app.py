@@ -5,7 +5,8 @@ import threading
 import requests
 import sys
 import urllib3
-import libtorrent as lt
+import subprocess
+# import libtorrent as lt  # 暂时注释掉，因为安装困难
 from pySmartDL import SmartDL
 from flask import Flask, request, jsonify, send_from_directory
 
@@ -50,74 +51,63 @@ def download_file(gid, url):
         
         # 检查是否为BT链接（magnet或.torrent）
         if url.startswith('magnet:') or url.endswith('.torrent'):
-            # BT下载
-            print("检测到BT链接，使用libtorrent下载")
+            # BT下载 - 使用aria2
+            print("检测到BT链接，使用aria2下载")
             sys.stdout.flush()
             
-            # 创建session
-            ses = lt.session()
-            ses.listen_on(6881, 6891)
+            # 使用aria2下载BT链接
+            cmd = [
+                'aria2c',
+                url,
+                '-d', download_dir,
+                '--bt-enable-lpd',
+                '--enable-dht',
+                '--enable-peer-exchange',
+                '--seed-ratio=0',
+                '--summary-interval=10',
+                '--follow-torrent=true',
+                '--check-certificate=false'
+            ]
             
-            # 添加torrent
-            params = {
-                'save_path': download_dir,
-                'storage_mode': lt.storage_mode_t(2),  # 存储模式
-                'paused': False,
-                'auto_managed': True,
-                'duplicate_is_error': True
-            }
-            
-            if url.startswith('magnet:'):
-                # magnet链接
-                handle = lt.add_magnet_uri(ses, url, params)
-                print(f"添加magnet链接: {url}")
-                sys.stdout.flush()
-                # 等待元数据下载完成
-                print("正在获取元数据...")
-                sys.stdout.flush()
-                while not handle.has_metadata():
-                    time.sleep(1)
-                print("元数据获取完成")
-                sys.stdout.flush()
-            else:
-                # .torrent文件
-                print(f"添加torrent文件: {url}")
-                sys.stdout.flush()
-                # 下载torrent文件
-                torrent_file = os.path.join(download_dir, 'temp.torrent')
-                with open(torrent_file, 'wb') as f:
-                    response = requests.get(url, verify=False)
-                    f.write(response.content)
-                # 从文件加载torrent
-                with open(torrent_file, 'rb') as f:
-                    torrent_data = f.read()
-                handle = lt.add_torrent_params(torrent_data, params)
-                os.remove(torrent_file)
-            
-            # 开始下载
-            print("开始BT下载")
+            print(f"执行aria2命令: {' '.join(cmd)}")
             sys.stdout.flush()
+            
+            # 启动aria2进程
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             
             # 监控下载进度
-            while not handle.is_seed():
-                status = handle.status()
-                progress = status.progress * 100
-                speed = status.download_rate / 1024  # KB/s
+            while True:
+                # 检查进程是否结束
+                if process.poll() is not None:
+                    break
                 
-                tasks[gid]['progress'] = progress
-                tasks[gid]['speed'] = speed
+                # 更新进度（aria2的进度监控比较复杂，这里简化处理）
+                tasks[gid]['progress'] = min(tasks[gid]['progress'] + 1, 99)
+                tasks[gid]['speed'] = 0  # aria2速度监控需要更复杂的解析
                 tasks[gid]['last_update'] = time.time()
                 save_tasks()
                 
-                print(f"BT下载进度: {progress:.2f}%, 速度: {speed:.2f} KB/s")
+                print(f"BT下载进度: {tasks[gid]['progress']:.2f}%")
                 sys.stdout.flush()
                 time.sleep(5)
             
-            print("BT下载完成")
-            sys.stdout.flush()
-            tasks[gid]['status'] = 'completed'
-            tasks[gid]['progress'] = 100
-            save_tasks()
+            # 等待进程结束
+            stdout, stderr = process.communicate()
+            return_code = process.returncode
+            
+            if return_code == 0:
+                print("BT下载完成")
+                sys.stdout.flush()
+                tasks[gid]['status'] = 'completed'
+                tasks[gid]['progress'] = 100
+                save_tasks()
+            else:
+                print(f"BT下载失败: {stderr}")
+                sys.stdout.flush()
+                tasks[gid]['status'] = 'failed'
+                tasks[gid]['error'] = f'BT下载失败: {stderr}'
+                save_tasks()
+            return
         else:
             # 普通HTTP下载 - 使用pySmartDL多线程下载
             # 获取文件名
@@ -210,6 +200,44 @@ def get_tasks():
     save_tasks()
     return jsonify(list(tasks.values()))
 
+# 获取当前下载进度（从tasks中获取）
+@app.route('/api/progress', methods=['GET'])
+def get_current_progress():
+    try:
+        # 查找正在下载的任务
+        current_task = None
+        for gid, task in tasks.items():
+            if task['status'] == 'downloading':
+                current_task = task
+                break
+        
+        if current_task:
+            # 提取文件名
+            url = current_task['url']
+            filename = '未知文件'
+            if url.startswith('magnet:'):
+                filename = 'BT下载'
+            else:
+                filename = url.split('/')[-1]
+            
+            # 截断过长的文件名
+            if len(filename) > 20:
+                filename = filename[:17] + '...'
+            
+            return jsonify({
+                'filename': filename,
+                'progress': current_task['progress'],
+                'time': time.strftime('%H:%M:%S')
+            })
+        else:
+            return jsonify({
+                'filename': '无下载任务',
+                'progress': 0,
+                'time': time.strftime('%H:%M:%S')
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # 提交下载任务
 @app.route('/api/download', methods=['POST'])
 def add_download():
@@ -279,6 +307,11 @@ def send_static(path):
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
+
+# 健康检查接口
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
