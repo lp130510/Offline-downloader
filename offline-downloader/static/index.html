@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>私有离线下载工具</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <!-- 自定义CSS -->
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3a0ca3;
+            --success-color: #4cc9f0;
+            --danger-color: #f72585;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: var(--dark-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 1rem 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-header {
+            background-color: var(--light-color);
+            border-bottom: 1px solid #e9ecef;
+            border-radius: 1rem 1rem 0 0 !important;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-danger:hover {
+            background-color: #d60c70;
+            border-color: #d60c70;
+            transform: translateY(-2px);
+        }
+        
+        .form-control {
+            border-radius: 0.5rem;
+            border: 1px solid #ced4da;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+        }
+        
+        .file-item {
+            transition: all 0.3s ease;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }
+        
+        .file-item:hover {
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+        
+        .file-icon {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+        }
+        
+        .directory-icon {
+            color: var(--primary-color);
+        }
+        
+        .file-icon {
+            color: #6c757d;
+        }
+        
+        .progress {
+            height: 0.75rem;
+            border-radius: 0.375rem;
+            background-color: #e9ecef;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            border-radius: 0.375rem;
+        }
+        
+        .task-item {
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem 0;
+        }
+        
+        .task-item:last-child {
+            border-bottom: none;
+        }
+        
+        .task-status {
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            display: inline-block;
+        }
+        
+        .status-pending {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .status-downloading {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .status-completed {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .status-failed {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .notification-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .notification-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                margin-bottom: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header text-center">
+        <div class="container">
+            <h1>私有离线下载工具</h1>
+            <p>轻松管理文件和下载任务</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="row">
+            <!-- 下载任务管理 -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>下载任务管理</span>
+                            <button id="refresh-tasks" class="btn btn-sm btn-primary">刷新</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 任务提交表单 -->
+                        <form id="download-form" class="mb-4">
+                            <div class="input-group">
+                                <input type="url" id="download-url" class="form-control" placeholder="输入下载链接" required>
+                                <button type="submit" class="btn btn-primary">开始下载</button>
+                            </div>
+                        </form>
+                        
+                        <!-- 任务列表 -->
+                        <div id="tasks-list">
+                            <p class="text-center text-muted">暂无下载任务</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 文件浏览器 -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>文件浏览器</span>
+                            <div class="d-flex">
+                                <select id="sort-select" class="form-select form-select-sm me-2">
+                                    <option value="name">按名称排序</option>
+                                    <option value="size">按大小排序</option>
+                                    <option value="mtime">按修改时间排序</option>
+                                </select>
+                                <button id="refresh-files" class="btn btn-sm btn-primary">刷新</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 文件路径导航 -->
+                        <nav aria-label="breadcrumb" class="mb-3">
+                            <ol class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="#" data-path="">根目录</a></li>
+                            </ol>
+                        </nav>
+                        
+                        <!-- 文件列表 -->
+                        <div id="files-list">
+                            <p class="text-center text-muted">加载文件中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 通知容器 -->
+    <div id="notifications"></div>
+    
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <!-- 自定义JS -->
+    <script>
+        // 当前路径
+        let currentPath = '';
+        
+        // 显示通知
+        function showNotification(message, type = 'success') {
+            const notifications = document.getElementById('notifications');
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notifications.appendChild(notification);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                notification.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => {
+                    notifications.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 格式化时间
+        function formatTime(timestamp) {
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString();
+        }
+        
+        // 加载文件列表
+        function loadFiles(path = '') {
+            fetch(`/api/files?path=${encodeURIComponent(path)}`) 
+                .then(response => response.json())
+                .then(data => {
+                    const filesList = document.getElementById('files-list');
+                    
+                    if (data.error) {
+                        filesList.innerHTML = `<p class="text-center text-danger">${data.error}</p>`;
+                        return;
+                    }
+                    
+                    // 排序
+                    const sortBy = document.getElementById('sort-select').value;
+                    data.sort((a, b) => {
+                        if (a.type === 'directory' && b.type === 'file') return -1;
+                        if (a.type === 'file' && b.type === 'directory') return 1;
+                        
+                        if (sortBy === 'name') {
+                            return a.name.localeCompare(b.name);
+                        } else if (sortBy === 'size') {
+                            return b.size - a.size;
+                        } else if (sortBy === 'mtime') {
+                            return b.mtime - a.mtime;
+                        }
+                        return 0;
+                    });
+                    
+                    if (data.length === 0) {
+                        filesList.innerHTML = '<p class="text-center text-muted">目录为空</p>';
+                        return;
+                    }
+                    
+                    let html = '<div class="list-group">';
+                    data.forEach(file => {
+                        if (file.type === 'directory') {
+                            html += `
+                                <a href="#" class="list-group-item list-group-item-action file-item" data-path="${path ? path + '/' + file.name : file.name}">
+                                    <div class="d-flex align-items-center">
+                                        <span class="file-icon directory-icon">📁</span>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">${file.name}</h6>
+                                            <small class="text-muted">目录</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            `;
+                        } else {
+                            html += `
+                                <a href="/download/${path ? path + '/' + file.name : file.name}" class="list-group-item list-group-item-action file-item" target="_blank">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="d-flex align-items-center">
+                                            <span class="file-icon">📄</span>
+                                            <div>
+                                                <h6 class="mb-1">${file.name}</h6>
+                                                <small class="text-muted">${formatFileSize(file.size)} · ${formatTime(file.mtime)}</small>
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-secondary">下载</span>
+                                    </div>
+                                </a>
+                            `;
+                        }
+                    });
+                    html += '</div>';
+                    filesList.innerHTML = html;
+                    
+                    // 添加目录点击事件
+                    document.querySelectorAll('.file-item[data-path]').forEach(item => {
+                        item.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            const newPath = this.getAttribute('data-path');
+                            currentPath = newPath;
+                            loadFiles(newPath);
+                            updateBreadcrumb(newPath);
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('加载文件失败:', error);
+                    showNotification('加载文件失败', 'error');
+                });
+        }
+        
+        // 更新面包屑导航
+        function updateBreadcrumb(path) {
+            const breadcrumb = document.querySelector('.breadcrumb');
+            const parts = path.split('/').filter(Boolean);
+            
+            let html = '<li class="breadcrumb-item"><a href="#" data-path="">根目录</a></li>';
+            let current = '';
+            
+            parts.forEach(part => {
+                current += (current ? '/' : '') + part;
+                html += `<li class="breadcrumb-item"><a href="#" data-path="${current}">${part}</a></li>`;
+            });
+            
+            breadcrumb.innerHTML = html;
+            
+            // 添加面包屑点击事件
+            breadcrumb.querySelectorAll('a[data-path]').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const newPath = this.getAttribute('data-path');
+                    currentPath = newPath;
+                    loadFiles(newPath);
+                    updateBreadcrumb(newPath);
+                });
+            });
+        }
+        
+        // 加载任务列表
+        function loadTasks() {
+            fetch('/api/tasks')
+                .then(response => response.json())
+                .then(data => {
+                    const tasksList = document.getElementById('tasks-list');
+                    
+                    if (data.length === 0) {
+                        tasksList.innerHTML = '<p class="text-center text-muted">暂无下载任务</p>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    data.forEach(task => {
+                        let statusClass = '';
+                        switch (task.status) {
+                            case 'pending':
+                                statusClass = 'status-pending';
+                                break;
+                            case 'active':
+                                statusClass = 'status-downloading';
+                                break;
+                            case 'complete':
+                                statusClass = 'status-completed';
+                                break;
+                            case 'error':
+                                statusClass = 'status-failed';
+                                break;
+                            default:
+                                statusClass = 'status-pending';
+                        }
+                        
+                        html += `
+                            <div class="task-item">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <h6 class="mb-1">${task.url}</h6>
+                                        <span class="task-status ${statusClass}">${task.status}</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-danger cancel-task" data-gid="${task.gid}">取消</button>
+                                </div>
+                                ${task.status === 'active' ? `
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar" role="progressbar" style="width: ${task.progress}%" aria-valuenow="${task.progress}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">进度: ${task.progress.toFixed(1)}%</small>
+                                        <small class="text-muted">速度: ${formatFileSize(task.speed)}/s</small>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    tasksList.innerHTML = html;
+                    
+                    // 添加取消任务事件
+                    document.querySelectorAll('.cancel-task').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const gid = this.getAttribute('data-gid');
+                            cancelTask(gid);
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('加载任务失败:', error);
+                    showNotification('加载任务失败', 'error');
+                });
+        }
+        
+        // 取消任务
+        function cancelTask(gid) {
+            fetch(`/api/task/${gid}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('任务已取消');
+                    loadTasks();
+                } else {
+                    showNotification('取消任务失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('取消任务失败:', error);
+                showNotification('取消任务失败', 'error');
+            });
+        }
+        
+        // 提交下载任务
+        document.getElementById('download-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const url = document.getElementById('download-url').value;
+            
+            fetch('/api/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url: url })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.gid) {
+                    showNotification('下载任务已添加');
+                    document.getElementById('download-url').value = '';
+                    loadTasks();
+                } else {
+                    showNotification('添加下载任务失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('添加下载任务失败:', error);
+                showNotification('添加下载任务失败', 'error');
+            });
+        });
+        
+        // 刷新文件列表
+        document.getElementById('refresh-files').addEventListener('click', function() {
+            loadFiles(currentPath);
+        });
+        
+        // 刷新任务列表
+        document.getElementById('refresh-tasks').addEventListener('click', function() {
+            loadTasks();
+        });
+        
+        // 排序变更
+        document.getElementById('sort-select').addEventListener('change', function() {
+            loadFiles(currentPath);
+        });
+        
+        // 初始加载
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFiles();
+            loadTasks();
+        });
+    </script>
+</body>
+</html>

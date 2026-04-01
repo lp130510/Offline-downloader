@@ -1,0 +1,24 @@
+# 使用指定的Python基础镜像
+FROM crpi-vd2np7sloa8wv5h3.cn-qingdao.personal.cr.aliyuncs.com/rhzzgongzuo/python:3.12
+
+# 创建应用目录
+RUN mkdir -p /app
+
+# 复制应用文件
+COPY . /app
+
+# 安装Python依赖
+RUN pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn -r /app/requirements.txt
+
+# 创建下载目录
+RUN mkdir -p /download
+
+# 启动脚本
+COPY start-python.sh /start-python.sh
+RUN chmod +x /start-python.sh
+
+# 暴露端口
+EXPOSE 8000
+
+# 启动服务
+CMD ["/start-python.sh"]

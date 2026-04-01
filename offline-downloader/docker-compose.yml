@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  nginx:
+    image: crpi-vd2np7sloa8wv5h3.cn-qingdao.personal.cr.aliyuncs.com/rhzz/nginx:latest
+    ports:
+      - "8021:8021"
+    volumes:
+      - ./static:/app/static
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ../download:/download
+    depends_on:
+      - python
+    restart: always
+
+  python:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    volumes:
+      - ../download:/download
+    restart: always
+    expose:
+      - "8000"
+
