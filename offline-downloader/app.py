@@ -36,16 +36,21 @@ def save_tasks():
 # 下载函数
 def download_file(gid, url):
     try:
+        print(f"开始下载: {url}")
         tasks[gid]['status'] = 'downloading'
         save_tasks()
         
         # 获取文件名
         filename = url.split('/')[-1]
         filepath = os.path.join(download_dir, filename)
+        print(f"保存路径: {filepath}")
         
         # 开始下载
-        response = requests.get(url, stream=True)
+        print(f"发起请求: {url}")
+        response = requests.get(url, stream=True, timeout=30)
+        print(f"响应状态: {response.status_code}")
         total_size = int(response.headers.get('content-length', 0))
+        print(f"文件大小: {total_size}")
         downloaded_size = 0
         
         with open(filepath, 'wb') as f:
@@ -66,10 +71,12 @@ def download_file(gid, url):
                             tasks[gid]['last_update'] = current_time
                         save_tasks()
         
+        print(f"下载完成: {filename}")
         tasks[gid]['status'] = 'completed'
         tasks[gid]['progress'] = 100
         save_tasks()
     except Exception as e:
+        print(f"下载失败: {str(e)}")
         tasks[gid]['status'] = 'failed'
         tasks[gid]['error'] = str(e)
         save_tasks()
