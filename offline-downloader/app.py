@@ -226,14 +226,12 @@ def get_current_progress():
             
             return jsonify({
                 'filename': filename,
-                'progress': current_task['progress'],
-                'time': time.strftime('%H:%M:%S')
+                'progress': current_task['progress']
             })
         else:
             return jsonify({
                 'filename': '无下载任务',
-                'progress': 0,
-                'time': time.strftime('%H:%M:%S')
+                'progress': 0
             })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
